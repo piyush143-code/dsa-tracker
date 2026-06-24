@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Piyush — DSA Tracker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --teal:#1A6B72;--teal-dark:#0f4a50;--teal-light:#E1F5EE;
+  --dark:#111827;--body:#1F2937;--muted:#6B7280;
+  --border:#E5E7EB;--bg:#F9FAFB;--white:#ffffff;
+  --easy:#3B6D11;--easy-bg:#EAF3DE;
+  --medium:#854F0B;--medium-bg:#FAEEDA;
+  --hard:#A32D2D;--hard-bg:#FCEBEB;
+  --success:#0F6E56;--success-bg:#E1F5EE;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--body);min-height:100vh;}
+
+header{background:var(--dark);padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-dot{width:10px;height:10px;background:var(--teal);border-radius:50%;}
+header h1{font-size:15px;font-weight:600;color:#fff;}
+.phase-badge{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--teal-light);background:rgba(26,107,114,0.25);padding:4px 12px;border-radius:20px;border:1px solid rgba(26,107,114,0.4);}
+
+nav{background:var(--white);border-bottom:1px solid var(--border);display:flex;padding:0 2rem;position:sticky;top:57px;z-index:99;}
+nav button{padding:13px 20px;font-size:13px;font-weight:500;font-family:'Inter',sans-serif;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;margin-bottom:-1px;}
+nav button:hover{color:var(--teal);}
+nav button.active{color:var(--teal);border-bottom-color:var(--teal);}
+
+.page{display:none;}.page.active{display:block;}
+.container{max-width:1100px;margin:0 auto;padding:2rem 1.5rem;}
+
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:2rem;}
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.5rem;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--teal);}
+.stat-label{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;}
+.stat-val{font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:500;color:var(--dark);line-height:1;}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:6px;}
+
+.main-grid{display:grid;grid-template-columns:320px 1fr;gap:1.5rem;align-items:start;}
+.card{background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.card-header{padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);}
+.card-header.teal{background:var(--teal);}
+.card-header h2{font-size:14px;font-weight:600;color:var(--dark);}
+.card-header.teal h2{color:#fff;}
+.card-body{padding:1.25rem;}
+.form-card{position:sticky;top:110px;}
+
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;}
+.field input,.field select,.field textarea{width:100%;padding:8px 10px;font-size:13px;font-family:'Inter',sans-serif;border:1px solid var(--border);border-radius:8px;color:var(--dark);background:var(--white);outline:none;transition:border-color 0.15s;}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(26,107,114,0.1);}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.check-row{display:flex;gap:1.5rem;margin-bottom:16px;}
+.check-row label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--body);cursor:pointer;}
+.check-row input[type="checkbox"]{width:15px;height:15px;accent-color:var(--teal);}
+
+.btn{width:100%;padding:10px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:background 0.15s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-teal{background:var(--teal);color:#fff;}
+.btn-teal:hover{background:var(--teal-dark);}
+.btn-teal:disabled{background:var(--muted);cursor:not-allowed;}
+
+.table-top{padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.table-top h2{font-size:14px;font-weight:600;color:var(--dark);}
+.filters{display:flex;gap:6px;flex-wrap:wrap;}
+.filter-btn{padding:4px 12px;font-size:12px;font-family:'Inter',sans-serif;border-radius:20px;border:1px solid var(--border);background:var(--white);color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.filter-btn:hover{border-color:var(--teal);color:var(--teal);}
+.filter-btn.active{background:var(--teal);color:white;border-color:var(--teal);}
+.search-wrap{padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);}
+.search-wrap input{width:100%;padding:7px 12px;font-size:13px;font-family:'Inter',sans-serif;border:1px solid var(--border);border-radius:8px;color:var(--dark);background:var(--bg);outline:none;}
+.search-wrap input:focus{border-color:var(--teal);background:var(--white);}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{padding:10px 14px;text-align:left;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;background:var(--bg);border-bottom:1px solid var(--border);}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:#F0FDF4;}
+td{padding:11px 14px;vertical-align:middle;}
+.td-name{font-weight:500;color:var(--dark);}
+.td-date{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:2px;}
+
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500;}
+.badge-easy{background:var(--easy-bg);color:var(--easy);}
+.badge-medium{background:var(--medium-bg);color:var(--medium);}
+.badge-hard{background:var(--hard-bg);color:var(--hard);}
+.badge-yes{background:var(--success-bg);color:var(--success);}
+.badge-no{background:var(--hard-bg);color:var(--hard);}
+.badge-review{background:var(--medium-bg);color:var(--medium);margin-left:5px;}
+.badge-optimal{background:var(--easy-bg);color:var(--easy);}
+.badge-good{background:var(--medium-bg);color:var(--medium);}
+.badge-needs{background:var(--hard-bg);color:var(--hard);}
+
+.del-btn{background:none;border:none;color:var(--border);cursor:pointer;font-size:16px;padding:3px 6px;border-radius:6px;transition:all 0.15s;}
+.del-btn:hover{color:var(--hard);background:var(--hard-bg);}
+.empty-state{padding:3rem;text-align:center;color:var(--muted);}
+.empty-state .ei{font-size:36px;margin-bottom:12px;opacity:0.4;}
+.empty-state p{font-size:14px;}
+.export-btn{padding:6px 14px;font-size:12px;font-family:'Inter',sans-serif;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.export-btn:hover{border-color:var(--teal);color:var(--teal);}
+
+.plan-section{margin-top:1.5rem;background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.plan-header{padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.plan-header h2{font-size:14px;font-weight:600;color:var(--dark);}
+.plan-grid{display:grid;grid-template-columns:repeat(5,1fr);}
+.plan-day{padding:1rem;border-right:1px solid var(--border);}
+.plan-day:last-child{border-right:none;}
+.plan-day-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--teal);margin-bottom:8px;}
+.plan-problem{font-size:11px;color:var(--body);padding:4px 0;border-bottom:1px dashed var(--border);display:flex;align-items:center;gap:6px;}
+.plan-problem:last-child{border-bottom:none;}
+.plan-dot{width:6px;height:6px;border-radius:50%;background:var(--border);flex-shrink:0;transition:background 0.2s;}
+.plan-dot.done{background:var(--teal);}
+.progress-bar-wrap{height:4px;background:var(--border);border-radius:2px;overflow:hidden;width:120px;display:inline-block;vertical-align:middle;margin-left:10px;}
+.progress-bar{height:100%;background:var(--teal);border-radius:2px;transition:width 0.4s ease;}
+
+.ai-container{max-width:900px;margin:0 auto;padding:2rem 1.5rem;}
+.ai-header{background:var(--dark);border-radius:12px;padding:1rem 1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;}
+.ai-header-left{display:flex;align-items:center;gap:10px;}
+.ai-header h2{font-size:15px;font-weight:600;color:#fff;}
+.ai-badge{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--teal-light);background:rgba(26,107,114,0.25);padding:4px 12px;border-radius:20px;border:1px solid rgba(26,107,114,0.4);}
+
+.api-key-bar{background:#FFF9E6;border:1px solid #F5D5A0;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.api-key-bar .ak-label{font-size:12px;font-weight:600;color:var(--medium);white-space:nowrap;}
+.api-key-bar input{flex:1;min-width:200px;padding:7px 10px;font-size:13px;font-family:'JetBrains Mono',monospace;border:1px solid var(--border);border-radius:8px;outline:none;color:var(--dark);}
+.api-key-bar input:focus{border-color:var(--teal);}
+.ak-save{padding:7px 16px;background:var(--teal);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;}
+.ak-save:hover{background:var(--teal-dark);}
+.ak-status{font-size:12px;color:var(--success);font-weight:500;}
+
+.code-area{width:100%;min-height:200px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:13px;border:1px solid var(--border);border-radius:8px;background:#0d1117;color:#e6edf3;outline:none;resize:vertical;line-height:1.6;}
+.code-area:focus{border-color:var(--teal);}
+.code-area::placeholder{color:#484f58;}
+
+.verdict-bar{display:flex;align-items:center;gap:12px;padding:1rem 1.25rem;border-radius:10px;margin-bottom:1.25rem;}
+.verdict-optimal{background:#EAF3DE;border:1px solid #c8e6b0;}
+.verdict-good{background:#FAEEDA;border:1px solid #f5d5a0;}
+.verdict-improve{background:#FCEBEB;border:1px solid #f5b8b8;}
+.verdict-icon{font-size:22px;}
+.verdict-text{font-size:13px;font-weight:500;}
+.verdict-optimal .verdict-text{color:var(--easy);}
+.verdict-good .verdict-text{color:var(--medium);}
+.verdict-improve .verdict-text{color:var(--hard);}
+
+.complexity-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.complexity-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;}
+.complexity-label{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:6px;}
+.complexity-val{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:500;color:var(--teal);}
+.complexity-val.optimal{color:var(--easy);}
+.complexity-note{font-size:12px;color:var(--muted);margin-top:4px;}
+
+.review-section{background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1.25rem;}
+.review-section-header{padding:0.875rem 1.25rem;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.review-section-header h3{font-size:13px;font-weight:600;color:var(--dark);}
+.review-section-body{padding:1.25rem;}
+.review-text{font-size:14px;color:var(--body);line-height:1.7;white-space:pre-wrap;}
+.optimized-code{background:#0d1117;color:#e6edf3;padding:1.25rem;font-family:'JetBrains Mono',monospace;font-size:13px;overflow-x:auto;white-space:pre-wrap;line-height:1.6;word-break:break-word;}
+.copy-btn{padding:4px 12px;font-size:11px;font-family:'Inter',sans-serif;background:rgba(255,255,255,0.1);color:#e6edf3;border:1px solid rgba(255,255,255,0.2);border-radius:6px;cursor:pointer;}
+.copy-btn:hover{background:rgba(255,255,255,0.2);}
+.history-item{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.875rem 1.25rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.history-item:last-child{margin-bottom:0;}
+.history-name{font-size:13px;font-weight:500;color:var(--dark);}
+.history-meta{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:3px;}
+.error-bar{background:var(--hard-bg);color:var(--hard);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+@media(max-width:768px){
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .main-grid{grid-template-columns:1fr;}
+  .form-card{position:static;}
+  .plan-grid{grid-template-columns:repeat(2,1fr);}
+  .complexity-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <h1>Piyush — DSA Tracker</h1>
+  </div>
+  <span class="phase-badge">Phase 1 · Warm Up</span>
+</header>
+
+<nav>
+  <button class="active" onclick="switchPage('tracker',this)">📋 Problem Tracker</button>
+  <button onclick="switchPage('review',this)">🤖 AI Code Review</button>
+</nav>
+
+<!-- ══════════ TRACKER PAGE ══════════ -->
+<div id="page-tracker" class="page active">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total solved</div>
+        <div class="stat-val" id="s-total">0</div>
+        <div class="stat-sub">problems logged</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">This week</div>
+        <div class="stat-val" id="s-week">0</div>
+        <div class="stat-sub">target: 10 / week</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Solved alone</div>
+        <div class="stat-val" id="s-alone">0</div>
+        <div class="stat-sub" id="s-alone-pct">— of total</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Need review</div>
+        <div class="stat-val" id="s-review">0</div>
+        <div class="stat-sub">revisit these</div>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <div class="card form-card">
+        <div class="card-header teal"><h2>Log a problem</h2></div>
+        <div class="card-body">
+          <div class="field">
+            <label>Problem name</label>
+            <input type="text" id="f-name" placeholder="e.g. Two Sum" />
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Difficulty</label>
+              <select id="f-diff">
+                <option>Easy</option><option selected>Medium</option><option>Hard</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Time (mins)</label>
+              <input type="number" id="f-time" placeholder="e.g. 25" min="1" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Pattern</label>
+            <select id="f-pattern">
+              <option>Arrays</option><option>Strings</option><option>Hashing</option>
+              <option>Two Pointers</option><option>Sliding Window</option>
+              <option>Binary Search</option><option>Linked List</option>
+              <option>Stack / Queue</option><option>Trees</option><option>Graphs</option>
+              <option>Dynamic Programming</option><option>Backtracking</option>
+              <option>Heap / Priority Queue</option><option>Intervals</option>
+              <option>Greedy</option><option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Date</label>
+            <input type="date" id="f-date" />
+          </div>
+          <div class="check-row">
+            <label><input type="checkbox" id="f-alone" checked /> Solved alone</label>
+            <label><input type="checkbox" id="f-review" /> Needs review</label>
+          </div>
+          <button class="btn btn-teal" onclick="addProblem()">+ Log problem</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" style="margin-bottom:0;">
+          <div class="table-top">
+            <h2>Problem log</h2>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <div class="filters">
+                <button class="filter-btn active" onclick="setFilter('All',this)">All</button>
+                <button class="filter-btn" onclick="setFilter('Easy',this)">Easy</button>
+                <button class="filter-btn" onclick="setFilter('Medium',this)">Medium</button>
+                <button class="filter-btn" onclick="setFilter('Hard',this)">Hard</button>
+                <button class="filter-btn" onclick="setFilter('Review',this)">Review</button>
+              </div>
+              <button class="export-btn" onclick="exportCSV()">Export CSV</button>
+            </div>
+          </div>
+          <div class="search-wrap">
+            <input type="text" id="search" placeholder="Search problems or patterns..." oninput="renderTracker()" />
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Problem</th><th>Difficulty</th><th>Pattern</th>
+                  <th>Time</th><th>Alone?</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="table-body"></tbody>
+            </table>
+          </div>
+          <div id="empty-state" class="empty-state" style="display:none;">
+            <div class="ei">📋</div>
+            <p>No problems logged yet.<br>Add your first one to get started.</p>
+          </div>
+        </div>
+
+        <div class="plan-section">
+          <div class="plan-header">
+            <h2>Phase 1 — Week 1 plan</h2>
+            <div>
+              <span style="font-size:12px;color:var(--muted);" id="plan-txt">0 / 10 done</span>
+              <div class="progress-bar-wrap">
+                <div class="progress-bar" id="plan-bar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="plan-grid" id="plan-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ AI REVIEW PAGE ══════════ -->
+<div id="page-review" class="page">
+  <div class="ai-container">
+
+    <div class="ai-header">
+      <div class="ai-header-left">
+        <div class="logo-dot"></div>
+        <h2>AI Code Review</h2>
+      </div>
+      <span class="ai-badge">Powered by Gemini</span>
+    </div>
+
+    <!-- API KEY BAR -->
+    <div class="api-key-bar">
+      <span class="ak-label">🔑 Gemini API Key</span>
+      <input type="password" id="api-key-input" placeholder="Paste your Gemini API key here (saved locally, never sent anywhere else)" />
+      <button class="ak-save" onclick="saveKey()">Save Key</button>
+      <span class="ak-status" id="ak-status" style="display:none;">✓ Key saved</span>
+    </div>
+
+    <!-- INPUT CARD -->
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-header teal"><h2>Paste your solution</h2></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+          <div class="field" style="margin-bottom:0;">
+            <label>Problem name</label>
+            <input type="text" id="ai-problem" placeholder="e.g. Two Sum" />
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Language</label>
+            <select id="ai-lang">
+              <option>C++</option><option>Java</option>
+              <option>Python</option><option>JavaScript</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Difficulty</label>
+            <select id="ai-diff">
+              <option>Easy</option><option selected>Medium</option><option>Hard</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Problem description (optional — improves accuracy)</label>
+          <textarea id="ai-desc" placeholder="Paste the problem statement here..." rows="3"
+            style="width:100%;padding:8px 10px;font-size:13px;font-family:'Inter',sans-serif;border:1px solid var(--border);border-radius:8px;color:var(--dark);background:var(--white);outline:none;resize:vertical;"></textarea>
+        </div>
+
+        <div class="field">
+          <label>Your code</label>
+          <textarea class="code-area" id="ai-code" placeholder="// Paste your solution here..."></textarea>
+        </div>
+
+        <div id="ai-error" class="error-bar" style="display:none;"></div>
+
+        <button class="btn btn-teal" id="review-btn" onclick="reviewCode()">
+          <span id="btn-label">🔍 Review my code</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="review-results" style="display:none;">
+      <div id="verdict-bar" class="verdict-bar verdict-good">
+        <span class="verdict-icon" id="verdict-icon">⚡</span>
+        <span class="verdict-text" id="verdict-text"></span>
+      </div>
+
+      <div class="review-section">
+        <div class="review-section-header"><h3>⏱ Complexity analysis</h3></div>
+        <div class="review-section-body">
+          <div class="complexity-grid">
+            <div class="complexity-card">
+              <div class="complexity-label">Your solution — Time</div>
+              <div class="complexity-val" id="r-ytime">—</div>
+              <div class="complexity-note" id="r-ytime-note"></div>
+            </div>
+            <div class="complexity-card">
+              <div class="complexity-label">Your solution — Space</div>
+              <div class="complexity-val" id="r-yspace">—</div>
+              <div class="complexity-note" id="r-yspace-note"></div>
+            </div>
+            <div class="complexity-card">
+              <div class="complexity-label">Optimal — Time</div>
+              <div class="complexity-val optimal" id="r-otime">—</div>
+              <div class="complexity-note" id="r-otime-note"></div>
+            </div>
+            <div class="complexity-card">
+              <div class="complexity-label">Optimal — Space</div>
+              <div class="complexity-val optimal" id="r-ospace">—</div>
+              <div class="complexity-note" id="r-ospace-note"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="review-section">
+        <div class="review-section-header"><h3>🔎 Code review</h3></div>
+        <div class="review-section-body">
+          <div class="review-text" id="r-review"></div>
+        </div>
+      </div>
+
+      <div class="review-section">
+        <div class="review-section-header">
+          <h3>✅ Optimized solution</h3>
+          <button class="copy-btn" onclick="copyOptimized()" id="copy-btn">Copy</button>
+        </div>
+        <div class="optimized-code" id="r-code"></div>
+      </div>
+
+      <div class="review-section">
+        <div class="review-section-header"><h3>💡 Key takeaways</h3></div>
+        <div class="review-section-body">
+          <div class="review-text" id="r-takeaways"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="history-card" style="display:none;margin-top:1.5rem;">
+      <div class="card-header"><h2>Recent reviews</h2></div>
+      <div class="card-body" id="history-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ── STATE ── */
+let problems = JSON.parse(localStorage.getItem('pg_problems') || '[]');
+let reviews  = JSON.parse(localStorage.getItem('pg_reviews')  || '[]');
+let activeFilter = 'All';
+
+const PLAN = [
+  {day:'Day 1', problems:['Two Sum','Best Time to Buy/Sell Stock']},
+  {day:'Day 2', problems:['Maximum Subarray','Product Except Self']},
+  {day:'Day 3', problems:['Longest Substring Without Repeat','Valid Anagram']},
+  {day:'Day 4', problems:['Group Anagrams','Longest Consecutive Sequence']},
+  {day:'Day 5', problems:['3Sum','Container With Most Water']},
+];
+
+document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+
+/* Load saved API key */
+const savedKey = localStorage.getItem('pg_gemini_key') || '';
+if (savedKey) {
+  document.getElementById('api-key-input').value = savedKey;
+  document.getElementById('ak-status').style.display = 'inline';
+}
+
+/* ── API KEY ── */
+function saveKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) { alert('Please paste your Gemini API key.'); return; }
+  localStorage.setItem('pg_gemini_key', key);
+  document.getElementById('ak-status').style.display = 'inline';
+}
+
+/* ── NAV ── */
+function switchPage(page, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  btn.classList.add('active');
+  if (page === 'review') renderHistory();
+}
+
+/* ── TRACKER ── */
+function addProblem() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { alert('Please enter a problem name.'); return; }
+  problems.unshift({
+    id: Date.now(), name,
+    diff: document.getElementById('f-diff').value,
+    pattern: document.getElementById('f-pattern').value,
+    time: document.getElementById('f-time').value || null,
+    date: document.getElementById('f-date').value,
+    alone: document.getElementById('f-alone').checked,
+    review: document.getElementById('f-review').checked
+  });
+  localStorage.setItem('pg_problems', JSON.stringify(problems));
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-time').value = '';
+  document.getElementById('f-alone').checked = true;
+  document.getElementById('f-review').checked = false;
+  renderTracker();
+}
+
+function deleteProblem(id) {
+  if (!confirm('Remove this problem?')) return;
+  problems = problems.filter(p => p.id !== id);
+  localStorage.setItem('pg_problems', JSON.stringify(problems));
+  renderTracker();
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTracker();
+}
+
+function getWeekStart() {
+  const d = new Date();
+  d.setDate(d.getDate() - d.getDay());
+  return d.toISOString().split('T')[0];
+}
+
+function exportCSV() {
+  if (!problems.length) { alert('No problems to export yet!'); return; }
+  const rows = [['Problem','Difficulty','Pattern','Time (mins)','Date','Solved Alone','Needs Review']];
+  problems.forEach(p => rows.push([p.name,p.diff,p.pattern,p.time||'',p.date,p.alone?'Yes':'No',p.review?'Yes':'No']));
+  const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'dsa_tracker_piyush.csv';
+  a.click();
+}
+
+function renderTracker() {
+  const ws = getWeekStart();
+  const total = problems.length;
+  const week  = problems.filter(p => p.date >= ws).length;
+  const alone = problems.filter(p => p.alone).length;
+  const rev   = problems.filter(p => p.review).length;
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-week').textContent  = week;
+  document.getElementById('s-alone').textContent = alone;
+  document.getElementById('s-alone-pct').textContent = total ? Math.round(alone/total*100)+'% of total' : '— of total';
+  document.getElementById('s-review').textContent = rev;
+
+  const q = document.getElementById('search').value.toLowerCase();
+  let list = [...problems];
+  if (activeFilter==='Easy')   list = list.filter(p=>p.diff==='Easy');
+  if (activeFilter==='Medium') list = list.filter(p=>p.diff==='Medium');
+  if (activeFilter==='Hard')   list = list.filter(p=>p.diff==='Hard');
+  if (activeFilter==='Review') list = list.filter(p=>p.review);
+  if (q) list = list.filter(p=>p.name.toLowerCase().includes(q)||p.pattern.toLowerCase().includes(q));
+
+  const tbody = document.getElementById('table-body');
+  const empty = document.getElementById('empty-state');
+  if (!list.length) { tbody.innerHTML=''; empty.style.display='block'; }
+  else {
+    empty.style.display='none';
+    tbody.innerHTML = list.map(p=>`
+      <tr>
+        <td><div class="td-name">${p.name}</div><div class="td-date">${p.date}</div></td>
+        <td><span class="badge badge-${p.diff.toLowerCase()}">${p.diff}</span></td>
+        <td style="font-size:12px;color:var(--muted)">${p.pattern}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${p.time?p.time+' min':'—'}</td>
+        <td>
+          <span class="badge ${p.alone?'badge-yes':'badge-no'}">${p.alone?'Yes':'No'}</span>
+          ${p.review?'<span class="badge badge-review">Review</span>':''}
+        </td>
+        <td><button class="del-btn" onclick="deleteProblem(${p.id})">✕</button></td>
+      </tr>`).join('');
+  }
+
+  const solved = problems.map(p=>p.name.toLowerCase());
+  let tp=0, dp=0;
+  document.getElementById('plan-grid').innerHTML = PLAN.map(day=>{
+    const rows = day.problems.map(prob=>{
+      tp++;
+      const done = solved.includes(prob.toLowerCase());
+      if(done) dp++;
+      return `<div class="plan-problem"><div class="plan-dot ${done?'done':''}"></div>${prob}</div>`;
+    }).join('');
+    return `<div class="plan-day"><div class="plan-day-label">${day.day}</div>${rows}</div>`;
+  }).join('');
+  const pct = tp ? Math.round(dp/tp*100) : 0;
+  document.getElementById('plan-txt').textContent = `${dp} / ${tp} done`;
+  document.getElementById('plan-bar').style.width = pct+'%';
+}
+
+/* ── AI REVIEW ── */
+async function reviewCode() {
+  const apiKey  = localStorage.getItem('pg_gemini_key') || document.getElementById('api-key-input').value.trim();
+  const problem = document.getElementById('ai-problem').value.trim();
+  const code    = document.getElementById('ai-code').value.trim();
+  const lang    = document.getElementById('ai-lang').value;
+  const diff    = document.getElementById('ai-diff').value;
+  const desc    = document.getElementById('ai-desc').value.trim();
+  const errEl   = document.getElementById('ai-error');
+
+  errEl.style.display = 'none';
+  if (!apiKey)  { errEl.textContent='Please enter and save your Gemini API key first.'; errEl.style.display='block'; return; }
+  if (!problem) { errEl.textContent='Please enter the problem name.'; errEl.style.display='block'; return; }
+  if (!code)    { errEl.textContent='Please paste your code first.'; errEl.style.display='block'; return; }
+
+  const btn   = document.getElementById('review-btn');
+  const label = document.getElementById('btn-label');
+  btn.disabled = true;
+  label.innerHTML = '<div class="spinner"></div> Reviewing your code...';
+  document.getElementById('review-results').style.display = 'none';
+
+  const prompt = `You are an expert DSA interviewer and competitive programmer reviewing ${lang} code.
+
+Problem: ${problem} (${diff})
+${desc ? 'Problem Description:\n' + desc + '\n' : ''}
+Submitted code:
+\`\`\`${lang.toLowerCase()}
+${code}
+\`\`\`
+
+Respond ONLY with a valid JSON object — no markdown, no text outside the JSON:
+{
+  "verdict": "optimal" | "good" | "needs_improvement",
+  "verdict_message": "one sentence overall assessment",
+  "your_time": "O(...)",
+  "your_time_note": "brief explanation",
+  "your_space": "O(...)",
+  "your_space_note": "brief explanation",
+  "optimal_time": "O(...)",
+  "optimal_time_note": "brief explanation",
+  "optimal_space": "O(...)",
+  "optimal_space_note": "brief explanation",
+  "review": "4-6 sentence review covering correctness, edge cases, code quality, interview readiness",
+  "optimized_code": "complete optimized ${lang} solution with inline comments explaining the approach and each key step",
+  "takeaways": "3-4 key learnings: the pattern used, the core trick, when to apply this in future problems"
+}`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 2048 }
+        })
+      }
+    );
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error.message);
+
+    const raw = data.candidates[0].content.parts[0].text;
+    const r   = JSON.parse(raw.replace(/```json|```/g,'').trim());
+
+    const vmap = {
+      optimal:           { cls:'verdict-optimal', icon:'🏆' },
+      good:              { cls:'verdict-good',    icon:'✅' },
+      needs_improvement: { cls:'verdict-improve', icon:'⚡' }
+    };
+    const v = vmap[r.verdict] || vmap.good;
+    const bar = document.getElementById('verdict-bar');
+    bar.className = 'verdict-bar ' + v.cls;
+    document.getElementById('verdict-icon').textContent = v.icon;
+    document.getElementById('verdict-text').textContent = r.verdict_message;
+
+    document.getElementById('r-ytime').textContent       = r.your_time;
+    document.getElementById('r-ytime-note').textContent  = r.your_time_note;
+    document.getElementById('r-yspace').textContent      = r.your_space;
+    document.getElementById('r-yspace-note').textContent = r.your_space_note;
+    document.getElementById('r-otime').textContent       = r.optimal_time;
+    document.getElementById('r-otime-note').textContent  = r.optimal_time_note;
+    document.getElementById('r-ospace').textContent      = r.optimal_space;
+    document.getElementById('r-ospace-note').textContent = r.optimal_space_note;
+
+    document.getElementById('r-review').textContent    = r.review;
+    document.getElementById('r-code').textContent      = r.optimized_code;
+    document.getElementById('r-takeaways').textContent = r.takeaways;
+
+    document.getElementById('review-results').style.display = 'block';
+
+    reviews.unshift({ id:Date.now(), problem, lang, diff, verdict:r.verdict, date:new Date().toLocaleDateString() });
+    if (reviews.length > 10) reviews = reviews.slice(0,10);
+    localStorage.setItem('pg_reviews', JSON.stringify(reviews));
+    renderHistory();
+
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message + '. Check your API key is correct and try again.';
+    errEl.style.display = 'block';
+  }
+
+  btn.disabled = false;
+  label.innerHTML = '🔍 Review my code';
+}
+
+function copyOptimized() {
+  const code = document.getElementById('r-code').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
+
+function renderHistory() {
+  const card = document.getElementById('history-card');
+  const list = document.getElementById('history-list');
+  if (!reviews.length) { card.style.display='none'; return; }
+  card.style.display = 'block';
+  const icons = { optimal:'🏆', good:'✅', needs_improvement:'⚡' };
+  const bcls  = { optimal:'badge-optimal', good:'badge-good', needs_improvement:'badge-needs' };
+  const blbl  = { optimal:'Optimal', good:'Good', needs_improvement:'Needs work' };
+  list.innerHTML = reviews.map(r => `
+    <div class="history-item">
+      <div>
+        <div class="history-name">${icons[r.verdict]||'⚡'} ${r.problem}</div>
+        <div class="history-meta">${r.lang} · ${r.diff} · ${r.date}</div>
+      </div>
+      <span class="badge ${bcls[r.verdict]||'badge-good'}">${blbl[r.verdict]||'Good'}</span>
+    </div>`).join('');
+}
+
+renderTracker();
+renderHistory();
+</script>
+</body>
+</html>
