@@ -319,13 +319,13 @@ td{padding:11px 14px;vertical-align:middle;}
         <div class="logo-dot"></div>
         <h2>AI Code Review</h2>
       </div>
-      <span class="ai-badge">Powered by Gemini</span>
+      <span class="ai-badge">Powered by Groq (Llama 3)</span>
     </div>
 
     <!-- API KEY BAR -->
     <div class="api-key-bar">
-      <span class="ak-label">🔑 Gemini API Key</span>
-      <input type="password" id="api-key-input" placeholder="Paste your Gemini API key here (saved locally, never sent anywhere else)" />
+      <span class="ak-label">🔑 Groq API Key</span>
+      <input type="password" id="api-key-input" placeholder="Paste your Groq API key here (saved locally, never sent anywhere else)" />
       <button class="ak-save" onclick="saveKey()">Save Key</button>
       <span class="ak-status" id="ak-status" style="display:none;">✓ Key saved</span>
     </div>
@@ -456,7 +456,7 @@ const PLAN = [
 document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
 
 /* Load saved API key */
-const savedKey = localStorage.getItem('pg_gemini_key') || '';
+const savedKey = localStorage.getItem('pg_groq_key') || '';
 if (savedKey) {
   document.getElementById('api-key-input').value = savedKey;
   document.getElementById('ak-status').style.display = 'inline';
@@ -466,7 +466,7 @@ if (savedKey) {
 function saveKey() {
   const key = document.getElementById('api-key-input').value.trim();
   if (!key) { alert('Please paste your Gemini API key.'); return; }
-  localStorage.setItem('pg_gemini_key', key);
+  localStorage.setItem('pg_groq_key', key);
   document.getElementById('ak-status').style.display = 'inline';
 }
 
@@ -588,7 +588,7 @@ function renderTracker() {
 
 /* ── AI REVIEW ── */
 async function reviewCode() {
-  const apiKey  = localStorage.getItem('pg_gemini_key') || document.getElementById('api-key-input').value.trim();
+  const apiKey  = localStorage.getItem('pg_groq_key') || document.getElementById('api-key-input').value.trim();
   const problem = document.getElementById('ai-problem').value.trim();
   const code    = document.getElementById('ai-code').value.trim();
   const lang    = document.getElementById('ai-lang').value;
@@ -635,21 +635,26 @@ Respond ONLY with a valid JSON object — no markdown, no text outside the JSON:
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      'https://api.groq.com/openai/v1/chat/completions',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 2048 }
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.2,
+          max_tokens: 2048,
+          messages: [{ role: 'user', content: prompt }]
         })
       }
     );
     const data = await res.json();
 
-    if (data.error) throw new Error(data.error.message);
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
-    const raw = data.candidates[0].content.parts[0].text;
+    const raw = data.choices[0].message.content;
     const r   = JSON.parse(raw.replace(/```json|```/g,'').trim());
 
     const vmap = {
