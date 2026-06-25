@@ -160,7 +160,7 @@ td{padding:11px 14px;vertical-align:middle;}
 .history-item:last-child{margin-bottom:0;}
 .history-name{font-size:13px;font-weight:500;color:var(--dark);}
 .history-meta{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:3px;}
-.error-bar{background:var(--hard-bg);color:var(--hard);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;}
+.error-bar{background:var(--hard-bg);color:var(--hard);padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px;white-space:pre-wrap;font-family:"JetBrains Mono",monospace;max-height:300px;overflow-y:auto;}
 .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
@@ -432,7 +432,13 @@ td{padding:11px 14px;vertical-align:middle;}
     </div>
 
     <div class="card" id="history-card" style="display:none;margin-top:1.5rem;">
-      <div class="card-header"><h2>Recent reviews</h2></div>
+      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <h2>All reviews <span id="review-count" style="font-size:11px;color:var(--muted);font-weight:400;margin-left:6px;"></span></h2>
+        <div style="display:flex;gap:8px;">
+          <button class="export-btn" onclick="exportReviews()">Export JSON</button>
+          <button class="export-btn" onclick="importReviewsPrompt()" title="Import from a backup JSON file">Import</button>
+        </div>
+      </div>
       <div class="card-body" id="history-list"></div>
     </div>
 
@@ -587,6 +593,79 @@ function renderTracker() {
 }
 
 /* ── AI REVIEW ── */
+
+/* ── ROBUST AI RESPONSE PARSER ── */
+function parseAIResponse(raw) {
+  // Step 1: strip markdown fences
+  let s = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+  // Step 2: find the JSON object boundaries
+  const firstBrace = s.indexOf('{');
+  const lastBrace = s.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace === -1) return null;
+  s = s.slice(firstBrace, lastBrace + 1);
+
+  // Step 3: try direct parse
+  try { return JSON.parse(s); } catch (e) { /* fall through */ }
+
+  // Step 4: aggressive cleanup — replace literal newlines inside string values with \n
+  // This is needed because Groq sometimes returns raw newlines inside JSON string values
+  let cleaned = '';
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { cleaned += ch; escape = false; continue; }
+    if (ch === '\\') { cleaned += ch; escape = true; continue; }
+    if (ch === '"') { inString = !inString; cleaned += ch; continue; }
+    if (inString) {
+      if (ch === '\n') { cleaned += '\\n'; }
+      else if (ch === '\r') { cleaned += '\\r'; }
+      else if (ch === '\t') { cleaned += '\\t'; }
+      else if (ch.charCodeAt(0) < 0x20) { /* skip other control chars */ }
+      else cleaned += ch;
+    } else {
+      cleaned += ch;
+    }
+  }
+  try { return JSON.parse(cleaned); } catch (e) { /* fall through */ }
+
+  // Step 5: regex-based field extraction as last resort
+  const get = (key) => {
+    const re = new RegExp('"' + key + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"', 's');
+    const m = s.match(re);
+    if (!m) return '';
+    return m[1]
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\');
+  };
+
+  const verdict = get('verdict') || 'good';
+  const fallback = {
+    verdict: verdict,
+    verdict_message: get('verdict_message') || 'Review completed',
+    your_time: get('your_time') || '—',
+    your_time_note: get('your_time_note'),
+    your_space: get('your_space') || '—',
+    your_space_note: get('your_space_note'),
+    optimal_time: get('optimal_time') || '—',
+    optimal_time_note: get('optimal_time_note'),
+    optimal_space: get('optimal_space') || '—',
+    optimal_space_note: get('optimal_space_note'),
+    review: get('review'),
+    optimized_code: get('optimized_code'),
+    takeaways: get('takeaways')
+  };
+
+  // Only return if at least 1 substantive field was extracted
+  if (fallback.review || fallback.optimized_code || fallback.takeaways) {
+    return fallback;
+  }
+  return null;
+}
+
 async function reviewCode() {
   const apiKey  = localStorage.getItem('pg_groq_key') || document.getElementById('api-key-input').value.trim();
   const problem = document.getElementById('ai-problem').value.trim();
@@ -595,6 +674,7 @@ async function reviewCode() {
   const diff    = document.getElementById('ai-diff').value;
   const desc    = document.getElementById('ai-desc').value.trim();
   const errEl   = document.getElementById('ai-error');
+  let lastRaw = '';
 
   errEl.style.display = 'none';
   if (!apiKey)  { errEl.textContent='Please enter and save your Gemini API key first.'; errEl.style.display='block'; return; }
@@ -607,7 +687,7 @@ async function reviewCode() {
   label.innerHTML = '<div class="spinner"></div> Reviewing your code...';
   document.getElementById('review-results').style.display = 'none';
 
-  const prompt = `You are an expert DSA interviewer and competitive programmer reviewing ${lang} code.
+  const prompt = `You are an expert DSA interviewer reviewing ${lang} code. You MUST respond with ONLY a single valid JSON object — no markdown fences, no commentary before or after.
 
 Problem: ${problem} (${diff})
 ${desc ? 'Problem Description:\n' + desc + '\n' : ''}
@@ -653,45 +733,17 @@ Respond ONLY with a valid JSON object — no markdown, no text outside the JSON:
     const data = await res.json();
 
     if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    if (!data.choices || !data.choices[0]) throw new Error('Empty response from API');
 
-    const raw = data.choices[0].message.content;
+    const raw = data.choices[0].message.content || '';
+    lastRaw = raw;
 
-    // Robust JSON extraction — handles code blocks, control chars, escaped sequences
-    let cleaned = raw;
-    // Strip markdown code fences
-    cleaned = cleaned.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
-    // Find the outermost JSON object
-    const firstBrace = cleaned.indexOf('{');
-    const lastBrace  = cleaned.lastIndexOf('}');
-    if (firstBrace === -1 || lastBrace === -1) throw new Error('No JSON found in response');
-    cleaned = cleaned.slice(firstBrace, lastBrace + 1);
-    // Remove control characters that break JSON.parse (but preserve \n \t in strings)
-    cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    if (!raw.trim()) throw new Error('AI returned an empty response. Try again.');
 
-    let r;
-    try {
-      r = JSON.parse(cleaned);
-    } catch(parseErr) {
-      // Fallback: extract fields manually using regex
-      const extract = (key) => {
-        const match = cleaned.match(new RegExp(`"${key}"\s*:\s*"((?:[^"\\]|\\[\s\S])*)"`, 's'));
-        return match ? match[1].replace(/\\n/g,'\n').replace(/\\t/g,'\t') : '—';
-      };
-      r = {
-        verdict: extract('verdict') || 'good',
-        verdict_message: extract('verdict_message'),
-        your_time: extract('your_time'),
-        your_time_note: extract('your_time_note'),
-        your_space: extract('your_space'),
-        your_space_note: extract('your_space_note'),
-        optimal_time: extract('optimal_time'),
-        optimal_time_note: extract('optimal_time_note'),
-        optimal_space: extract('optimal_space'),
-        optimal_space_note: extract('optimal_space_note'),
-        review: extract('review'),
-        optimized_code: extract('optimized_code'),
-        takeaways: extract('takeaways'),
-      };
+    // Parse JSON safely — handle code fences, control chars, and quoted code blocks
+    const r = parseAIResponse(raw);
+    if (!r) {
+      throw new Error('Could not parse AI response. Raw response shown below.');
     }
 
     const vmap = {
@@ -720,13 +772,36 @@ Respond ONLY with a valid JSON object — no markdown, no text outside the JSON:
 
     document.getElementById('review-results').style.display = 'block';
 
-    reviews.unshift({ id:Date.now(), problem, lang, diff, verdict:r.verdict, date:new Date().toLocaleDateString() });
-    if (reviews.length > 10) reviews = reviews.slice(0,10);
-    localStorage.setItem('pg_reviews', JSON.stringify(reviews));
+    reviews.unshift({
+      id: Date.now(),
+      problem, lang, diff,
+      verdict: r.verdict,
+      verdict_message: r.verdict_message,
+      submittedCode: code,
+      optimizedCode: r.optimized_code,
+      reviewText: r.review,
+      takeaways: r.takeaways,
+      yourTime: r.your_time,
+      yourSpace: r.your_space,
+      optimalTime: r.optimal_time,
+      optimalSpace: r.optimal_space,
+      date: new Date().toLocaleDateString()
+    });
+    // Save all reviews — no cap. localStorage handles ~5MB which is thousands of reviews.
+    try {
+      localStorage.setItem('pg_reviews', JSON.stringify(reviews));
+    } catch (storageErr) {
+      // Browser localStorage is full (extremely rare — only after thousands of reviews)
+      alert('Storage limit reached. Please export your reviews to JSON below to free up space.');
+    }
     renderHistory();
 
   } catch(e) {
-    errEl.textContent = 'Error: ' + e.message + '. Check your API key is correct and try again.';
+    let msg = 'Error: ' + e.message;
+    if (lastRaw) {
+      msg += '\n\nRaw AI response (first 500 chars):\n' + lastRaw.substring(0, 500);
+    }
+    errEl.textContent = msg;
     errEl.style.display = 'block';
   }
 
@@ -743,22 +818,102 @@ function copyOptimized() {
   });
 }
 
+
+function exportReviews() {
+  if (!reviews.length) { alert('No reviews to export yet!'); return; }
+  const blob = new Blob([JSON.stringify(reviews, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `dsa_reviews_backup_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importReviewsPrompt() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (!Array.isArray(imported)) throw new Error('Invalid format');
+        if (!confirm(`Import ${imported.length} reviews? This will merge with your current ${reviews.length} reviews.`)) return;
+        // Merge — avoid duplicates by id
+        const existing = new Set(reviews.map(r => r.id));
+        imported.forEach(r => { if (!existing.has(r.id)) reviews.push(r); });
+        // Sort by date desc
+        reviews.sort((a, b) => b.id - a.id);
+        localStorage.setItem('pg_reviews', JSON.stringify(reviews));
+        renderHistory();
+        alert(`Imported successfully! You now have ${reviews.length} reviews.`);
+      } catch (err) {
+        alert('Could not import file: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
 function renderHistory() {
   const card = document.getElementById('history-card');
   const list = document.getElementById('history-list');
+  const countEl = document.getElementById('review-count');
   if (!reviews.length) { card.style.display='none'; return; }
   card.style.display = 'block';
+  if (countEl) countEl.textContent = `(${reviews.length} total)`;
+  list.style.maxHeight = '500px';
+  list.style.overflowY = 'auto';
   const icons = { optimal:'🏆', good:'✅', needs_improvement:'⚡' };
   const bcls  = { optimal:'badge-optimal', good:'badge-good', needs_improvement:'badge-needs' };
   const blbl  = { optimal:'Optimal', good:'Good', needs_improvement:'Needs work' };
-  list.innerHTML = reviews.map(r => `
-    <div class="history-item">
+  list.innerHTML = reviews.map((r, idx) => `
+    <div class="history-item" style="cursor:pointer;" onclick="loadHistoryItem(${idx})" title="Click to view this review">
       <div>
         <div class="history-name">${icons[r.verdict]||'⚡'} ${r.problem}</div>
         <div class="history-meta">${r.lang} · ${r.diff} · ${r.date}</div>
       </div>
       <span class="badge ${bcls[r.verdict]||'badge-good'}">${blbl[r.verdict]||'Good'}</span>
     </div>`).join('');
+}
+
+function loadHistoryItem(idx) {
+  const r = reviews[idx];
+  if (!r) return;
+
+  // Restore form fields
+  document.getElementById('ai-problem').value = r.problem;
+  document.getElementById('ai-lang').value = r.lang;
+  document.getElementById('ai-diff').value = r.diff;
+  document.getElementById('ai-code').value = r.submittedCode || '';
+
+  // Restore result fields
+  const vmap = {
+    optimal: { cls:'verdict-optimal', icon:'🏆' },
+    good: { cls:'verdict-good', icon:'✅' },
+    needs_improvement: { cls:'verdict-improve', icon:'⚡' }
+  };
+  const v = vmap[r.verdict] || vmap.good;
+  const bar = document.getElementById('verdict-bar');
+  bar.className = 'verdict-bar ' + v.cls;
+  document.getElementById('verdict-icon').textContent = v.icon;
+  document.getElementById('verdict-text').textContent = r.verdict_message || '';
+
+  document.getElementById('r-ytime').textContent = r.yourTime || '—';
+  document.getElementById('r-yspace').textContent = r.yourSpace || '—';
+  document.getElementById('r-otime').textContent = r.optimalTime || '—';
+  document.getElementById('r-ospace').textContent = r.optimalSpace || '—';
+
+  document.getElementById('r-review').textContent = r.reviewText || '';
+  document.getElementById('r-code').textContent = r.optimizedCode || '';
+  document.getElementById('r-takeaways').textContent = r.takeaways || '';
+
+  document.getElementById('review-results').style.display = 'block';
+  document.getElementById('review-results').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
 renderTracker();
